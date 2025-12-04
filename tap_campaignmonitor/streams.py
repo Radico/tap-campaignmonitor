@@ -126,7 +126,32 @@ def run_suppression_request(context):
     while current_page <= total_pages:
 
         response = context.client.retry_get(stream='suppressionlist', page=current_page)
-        data = json.loads(response.content)
+
+        if response.status_code != 200:
+            logger.error(
+                'Suppression list request failed with status code {status}. '
+                'Response: {content}'.format(
+                    status=response.status_code,
+                    content=response.content))
+            raise Exception(
+                'Suppression list API returned status {status}'.format(
+                    status=response.status_code))
+
+        try:
+            data = json.loads(response.content)
+        except json.decoder.JSONDecodeError as e:
+            logger.error('Failed to parse suppression list response: {r}'.format(
+                r=response.content))
+            raise e
+
+        if 'TotalNumberOfRecords' not in data:
+            logger.error(
+                'Unexpected API response structure. Expected TotalNumberOfRecords key. '
+                'Response: {content}'.format(content=response.content))
+            raise KeyError(
+                'TotalNumberOfRecords not found in API response. '
+                'Check logs for full response content.')
+
         if current_page == 1:
             logger.info(
                 '{ts} querying suppresion list now - will retrieve '
